@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+body {
+  background-color: #0b0f19; /* The deep dark blue from your design */
+  color: #ffffff;
+}
+/* ⚡ DYNAMIC ENGINE CSS MATRIX VARIABLE MAPS */
+:root {
+  --bg-workspace: #0a0f1d;
+  --bg-card: #0f1422;
+  --bg-input: #141a2e;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --border-primary: #1e293b;
+}
+
+/* Force light layout state overrides when crisp light is selected */
+.theme-light-mode .w-64.h-screen {
+  background-color: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+.theme-light-mode .w-64.h-screen span,
+.theme-light-mode .w-64.h-screen div {
+  color: #334155 !important;
+}
+.theme-light-mode .w-64.h-screen .hover\:text-white:hover {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+}
