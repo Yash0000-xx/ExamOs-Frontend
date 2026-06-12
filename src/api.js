@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'https://examos-backend-lxa4.onrender.com';
 
 /**
  * 🛡️ THE INTERCEPTOR
