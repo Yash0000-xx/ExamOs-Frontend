@@ -13,48 +13,45 @@ import OnboardingWizard from './components/onboarding/OnboardingWizard';
 import QuizPage from './QuizPage'; 
 import NotesArena from './NotesArena'; 
 import Workspace from './Workspace'; 
-import { fetchData } from './api.js'; // 🔗 Imported your new master API bridge!
+import { fetchData } from './api.js';
 
 export default function App() {
-  // 🎯 FIX: Syncing the key exactly with the Interceptor ('token')
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [isSetupComplete, setIsSetupComplete] = useState(false);
-  const [isCheckingDatabase, setIsCheckingDatabase] = useState(true); 
+  
+  // 1. Initialize setup status from storage for instant UI snap
+  const [isSetupComplete, setIsSetupComplete] = useState(localStorage.getItem('examos-setup-done') === 'true');
+  
+  // 2. THIS IS THE GATEKEEPER: The app only renders content when this is true
+  const [isAppReady, setIsAppReady] = useState(false); 
+  
   const [currentPage, setCurrentPage] = useState('Dashboard'); 
   const [activeDocumentId, setActiveDocumentId] = useState(null);
   const [showAuthWall, setShowAuthWall] = useState(false);
 
   useEffect(() => {
     const verifyUserDataFootprint = async () => {
+      // If not authenticated, we are "ready" to show the landing page
       if (!isAuthenticated) {
-        setIsCheckingDatabase(false);
+        setIsAppReady(true);
         return;
       }
 
       try {
-        // 🌐 FIX: Use the central API bridge! It automatically attaches the token and uses the deployed URL.
         const result = await fetchData('subjects/tree');
 
         if (result && result.data && result.data.length > 0) {
-          console.log(`🙋‍♂️ Existing user verified via DB tree. Core bypass active.`);
           setIsSetupComplete(true);
-          // 🧹 Force sync local storage to truth
           localStorage.setItem('examos-setup-done', 'true'); 
         } else {
-          console.log(`🐣 Brand-new user footprint detected. Routing to Onboarding Wizard.`);
           setIsSetupComplete(false);
-          // 🧹 Purge ghost data from previous accounts
           localStorage.removeItem('examos-setup-done'); 
         }
       } catch (err) {
-        console.log("⚠️ Database status validation cold boot. Falling back to local storage parameters.");
-        if (localStorage.getItem('examos-setup-done') === 'true') {
-          setIsSetupComplete(true);
-        } else {
-          setIsSetupComplete(false);
-        }
+        // Keep existing storage state on failure
+        console.log("Database offline; relying on local cache.");
       } finally {
-        setIsCheckingDatabase(false);
+        // Only mark app as ready AFTER the check is done
+        setIsAppReady(true); 
       }
     };
 
@@ -62,7 +59,7 @@ export default function App() {
   }, [isAuthenticated]);
 
   const handleLogout = () => {
-    localStorage.clear(); // This safely wipes 'token', 'examos-setup-done', everything!
+    localStorage.clear();
     setIsSetupComplete(false);
     setIsAuthenticated(false);
     setShowAuthWall(false);
@@ -71,42 +68,26 @@ export default function App() {
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'Dashboard':
-        return <DashboardOverview />; 
-      case 'Subjects':
-        return <Subjects onTriggerNewOnboarding={() => setIsSetupComplete(false)} />; 
-      case 'Flashcards':
-        return <FlashcardsPage />;
-      case 'Analytics':
-        return <Analytics />;
-      case 'Revision':
-        return <Revision />; 
-      case 'Panic Mode':
-        return <PanicMode />; 
-      case 'Quiz Arena':
-        return <QuizPage />; 
-      case 'Notes Arena':
-        return <NotesArena documentId={activeDocumentId} />;
+      case 'Dashboard': return <DashboardOverview />; 
+      case 'Subjects': return <Subjects onTriggerNewOnboarding={() => setIsSetupComplete(false)} />; 
+      case 'Flashcards': return <FlashcardsPage />;
+      case 'Analytics': return <Analytics />;
+      case 'Revision': return <Revision />; 
+      case 'Panic Mode': return <PanicMode />; 
+      case 'Quiz Arena': return <QuizPage />; 
+      case 'Notes Arena': return <NotesArena documentId={activeDocumentId} />;
       case 'Workspace':
-      return <Workspace 
-              setCurrentPage={setCurrentPage} 
-              setActiveDocumentId={setActiveDocumentId} 
-            />;
-      case 'Settings':
-        return <Settings onLogout={handleLogout} />; 
-      default:
-        return <DashboardOverview />;
+        return <Workspace 
+                setCurrentPage={setCurrentPage} 
+                setActiveDocumentId={setActiveDocumentId} 
+              />;
+      case 'Settings': return <Settings onLogout={handleLogout} />; 
+      default: return <DashboardOverview />;
     }
   };
 
-  if (!isAuthenticated) {
-    if (showAuthWall) {
-      return <AuthPage onLoginSuccess={() => setIsAuthenticated(true)} />;
-    }
-    return <LandingPage onGetStarted={() => setShowAuthWall(true)} />;
-  }
-
-  if (isCheckingDatabase) {
+  // 3. SHOW LOADING UNTIL APP IS READY
+  if (!isAppReady) {
     return (
       <div className="min-h-screen bg-[#0a0f1d] flex flex-col items-center justify-center text-gray-400 font-mono text-xs">
         <div className="h-6 w-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -115,10 +96,22 @@ export default function App() {
     );
   }
 
+  // 4. NOW HANDLE THE AUTH/SETUP FLOWS
+  if (!isAuthenticated) {
+    if (showAuthWall) {
+      return <AuthPage onLoginSuccess={() => {
+        setIsAuthenticated(true);
+        setIsAppReady(false); // Force re-trigger of the check for the new user
+      }} />;
+    }
+    return <LandingPage onGetStarted={() => setShowAuthWall(true)} />;
+  }
+
   if (!isSetupComplete) {
     return <OnboardingWizard onComplete={() => setIsSetupComplete(true)} />;
   }
 
+  // 5. FINALLY, THE MAIN APP
   return (
     <div className="flex min-h-screen bg-[var(--bg-workspace)] transition-colors duration-200">
       <Sidebar 
